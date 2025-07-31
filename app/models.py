@@ -23,8 +23,10 @@ class User(UserMixin,db.Model):
     last_seen: so.Mapped[Optional[datetime]] = so.mapped_column(default=lambda: datetime.now(timezone.utc))
 
     posts: so.WriteOnlyMapped['Post'] = so.relationship('Post', back_populates='author')
-    following: so.WriteOnlyMapped['User'] = so.relationship(secondary=followers, primaryjoin=(followers.c.follower_id==id),secondaryjoin=(followers.c.followed_id==id),back_populates='followers')
-    followers: so.WriteOnlyMapped['User'] = so.relationship(secondary=followers,primaryjoin=(followers.c.followed_id==id),secondaryjoin=(followers.c.follower_id==id),back_populates='followers')
+    following: so.WriteOnlyMapped['User'] = so.relationship(secondary=followers, primaryjoin=(followers.c.follower_id==id),
+                                                            secondaryjoin=(followers.c.followed_id==id),back_populates='followers')
+    followers: so.WriteOnlyMapped['User'] = so.relationship(secondary=followers,primaryjoin=(followers.c.followed_id==id),
+                                                            secondaryjoin=(followers.c.follower_id==id),back_populates='following')
 
     def __repr__(self) -> str:
         return '<User {}>'.format(self.username)
@@ -52,12 +54,26 @@ class User(UserMixin,db.Model):
         return db.session.scalar(query) is not None
     
     def followers_count(self):
-        query = sa.select(sa.func.count().select_from(self.followers.select().subquery()))
+        query = sa.select(sa.func.count()).select_from(self.followers.select().subquery())
         return db.session.scalar(query)
     
     def following_count(self):
-        query = sa.select(sa.func.count().select_from(self.following.select().subquery()))
+        query = sa.select(sa.func.count()).select_from(self.following.select().subquery())
         return db.session.scalar(query)
+    
+    def following_posts(self):
+        Author = so.aliased(User)
+        Follower = so.aliased(User)
+        return (
+            sa.select(Post).
+            join(Post.author.of_type(Author)).
+            join(Author.followers.of_type(Follower), isouter=True).
+            where(sa.or_(
+                Follower.id==self.id,
+                Author.id==self.id,)).
+            group_by(Post).
+            order_by(Post.timestamp.desc())
+        )
     
     
 class Post(db.Model):
