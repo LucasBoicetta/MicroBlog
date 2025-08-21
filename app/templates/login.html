@@ -23,5 +23,9 @@
         <p>
             <a href="{{ url_for('register') }}">Don't have an account? Register here.</a>
         </p>
+        <p>
+            Forgot Your Password?
+            <a href="{{ url_for('reset_password_request') }}">Click to reset it</a>
+        </p>
     </form>
 {% endblock %}
